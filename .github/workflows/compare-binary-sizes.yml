@@ -63,9 +63,9 @@ jobs:
 
   binary_size_info:
     name: Compute binary size information
-    needs: [bloaty]
+    needs: [ bloaty ]
     runs-on: windows-latest
-  
+
     env:
       BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
 
@@ -82,7 +82,7 @@ jobs:
 
       - name: Add bloaty to PATH
         run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    
+
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
       - name: Generate bloaty options file
         run: |
@@ -116,4 +116,3 @@ jobs:
           with:
             key: ${{ env.BLOATY_CACHE_KEY }}
             path: ${{ env.BLOATY_OUTPUT_FILE }}
-     
