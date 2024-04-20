@@ -23,7 +23,7 @@ jobs:
 
   compute_binary_sizes:
     needs: [build]
-    call: kendalharland/compute-binary-sizes.yml@main
+    uses: kendalharland/compute-binary-sizes.yml@main
     with:
       artifact: binaries
 

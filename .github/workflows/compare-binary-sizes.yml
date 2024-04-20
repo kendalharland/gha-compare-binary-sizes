@@ -63,7 +63,7 @@ jobs:
 
   binary_size_info:
     name: Compute binary size information
-    needs: [ bloaty ]
+    needs: [bloaty]
     runs-on: windows-latest
 
     env:
