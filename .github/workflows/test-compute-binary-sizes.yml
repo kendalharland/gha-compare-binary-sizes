@@ -2,15 +2,17 @@ name: Test compute binary sizes
 
 on:
   pull_request:
-
+  workflow_dispatch:
+  
 jobs:
   build:
+    name: Build artifacts
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build artifacts
+      - name: Build main
         run: |
           New-Item -ItemType directory build
           gcc test/main.c -o build/main
@@ -22,8 +24,9 @@ jobs:
           path: build
 
   compute_binary_sizes:
+    name: Compute binary sizes
     needs: [build]
-    uses: kendalharland/compute-binary-sizes.yml@main
+    uses: ./.github/workflows/compute-binary-sizes.yml
     with:
       artifact: binaries
 
