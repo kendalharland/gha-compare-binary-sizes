@@ -19,3 +19,5 @@ Call this workflow as a postsubmit job in your CI.
 # TODO:
 # - Either use a more specific cache name or allow the caller to specify.
 # - Name the bloaty output file using the parent commit ref if possible.
+# - Write python program to diff files based on bloaty output.
+# - Store bloaty output in a directory that is unlikely to conflict with the user's project.
