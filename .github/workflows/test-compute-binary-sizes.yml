@@ -1,0 +1,26 @@
+name: Test compute binary sizes
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build artifacts
+        run: |
+          New-Item -ItemType directory build
+          gcc test/main.c -o build/main
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: build
+
+  compute_binary_sizes:
+    needs: [build]
+    call: kendalharland/compute-binary-sizes.yml@main
+    with:
+      artifact: binaries
+      
