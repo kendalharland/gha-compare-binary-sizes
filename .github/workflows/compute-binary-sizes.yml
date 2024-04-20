@@ -62,7 +62,7 @@ jobs:
           Copy-Item ${{ env.BUILD_ROOT }}/bloaty/bloaty.exe -Destination ${{ env.BLOATY_CACHE_PATH }}
 
   binary_size_info:
-    name: Compute binary size information
+    name: Compute binary sizes
     needs: [bloaty]
     runs-on: windows-latest
   
@@ -80,7 +80,7 @@ jobs:
       - name: Add bloaty to PATH
         run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     
-      - name: Download artifact
+      - name: Download binary artifacts
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.artifact }}

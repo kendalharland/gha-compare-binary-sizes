@@ -5,7 +5,7 @@ on:
   
 jobs:
   build:
-    name: Build artifacts
+    name: Build artifacts for comparison
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -16,7 +16,7 @@ jobs:
           New-Item -ItemType directory build
           gcc test/main.c -o build/main
 
-      - name: Upload artifacts
+      - name: Upload artifacts for comparison
         uses: actions/upload-artifact@v4
         with:
           name: binaries
