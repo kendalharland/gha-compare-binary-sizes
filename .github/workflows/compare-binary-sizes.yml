@@ -15,6 +15,7 @@ env:
   BLOATY_CACHE_KEY: bloaty
   BLOATY_CACHE_PATH: cache/bin/bloaty
   BLOATY_OUTPUT_FILE: ${{ github.workspace }}/bloaty-output.csv
+  BASE_REF_BLOATY_OUTPUT_FILE: ${{ github.workspace }}/base-ref-bloaty-output.csv
 
 jobs:
   bloaty:
@@ -67,24 +68,36 @@ jobs:
     runs-on: windows-latest
 
     env:
+      ARTIFACT_ROOT: ${{ github.workspace }}/artifacts
       BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
 
     steps:
+      - name: Restore base ref bloaty output
+        id: cache
+        uses: actions/cache/restore@v3
+        with:
+          key: ${{ env.BLOATY_OUTPUT_CACHE_KEY }}
+          path: ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }}
+
       - uses: actions/checkout@v4
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         with:
           show-progress: false
 
       - name: Restore bloaty
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         uses: actions/cache/restore@v3
         with:
           key: ${{ env.BLOATY_CACHE_KEY }}
           path: ${{ env.BLOATY_CACHE_PATH }}
 
       - name: Add bloaty to PATH
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
       - name: Generate bloaty options file
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
@@ -105,14 +118,15 @@ jobs:
           echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
       - name: Show bloaty options file
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         run: Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
         run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
 
-      - name: Cache bloaty output
-        id: cache
-        uses: actions/cache/save@v3
-        with:
-          key: ${{ env.BLOATY_CACHE_KEY }}
-          path: ${{ env.BLOATY_OUTPUT_FILE }}
+      - name: Diff bloaty output
+        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+        run: compare-object (get-content ${{ env.BLOATY_OUTPUT_FILE }}) (get-content ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }})
+
+        

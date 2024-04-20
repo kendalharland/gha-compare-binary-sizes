@@ -113,6 +113,9 @@ jobs:
       - name: Run bloaty
         run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
 
+      - name: Show bloaty output
+        run: Get-Content ${{ env.BLOATY_OUTPUT_FILE }}
+
       - name: Cache bloaty output
         id: cache
         uses: actions/cache/save@v3
