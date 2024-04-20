@@ -1,12 +1,8 @@
-name: Test compute binary sizes
+name: Test compare binary sizes
 
 on:
-  push:
-    branches:
-      - 'main'
-
-  workflow_dispatch:
-
+  pull_request:
+  
 jobs:
   build:
     name: Build artifacts
@@ -26,10 +22,10 @@ jobs:
           name: binaries
           path: build
 
-  compute_binary_sizes:
-    name: Compute binary sizes
+  compare_binary_sizes:
+    name: Compare binary sizes
     needs: [build]
-    uses: ./.github/workflows/compute-binary-sizes.yml
+    uses: ./.github/workflows/compare-binary-sizes.yml
     with:
       artifact: binaries
 
