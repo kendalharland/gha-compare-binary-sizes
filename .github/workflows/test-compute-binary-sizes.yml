@@ -23,4 +23,4 @@ jobs:
     call: kendalharland/compute-binary-sizes.yml@main
     with:
       artifact: binaries
-      
+

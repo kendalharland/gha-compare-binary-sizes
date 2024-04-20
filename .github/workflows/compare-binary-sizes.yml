@@ -70,7 +70,7 @@ jobs:
       BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
 
     steps:
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           show-progress: false
 

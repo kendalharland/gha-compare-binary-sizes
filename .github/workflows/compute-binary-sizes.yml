@@ -116,9 +116,9 @@ jobs:
         run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
 
       - name: Setup bloaty output cache
-          id: cache
-          uses: actions/cache/save@v3
-          with:
-            key: ${{ env.BLOATY_CACHE_KEY }}
-            path: ${{ env.BLOATY_OUTPUT_FILE }}
+        id: cache
+        uses: actions/cache/save@v3
+        with:
+          key: ${{ env.BLOATY_CACHE_KEY }}
+          path: ${{ env.BLOATY_OUTPUT_FILE }}
      
