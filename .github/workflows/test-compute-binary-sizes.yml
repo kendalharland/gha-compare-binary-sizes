@@ -1,5 +1,8 @@
 name: Test compute binary sizes
 
+on:
+  pull_request:
+
 jobs:
   build:
     runs-on: windows-latest
