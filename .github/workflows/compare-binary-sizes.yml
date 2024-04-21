@@ -9,10 +9,13 @@ on:
 env:
   SOURCE_ROOT: ${{ github.workspace }}/source
   BUILD_ROOT: ${{ github.workspace }}/build
-  BLOATY_CACHE_KEY: bloaty
+
+  # These values must match the ones in compute-binary-sizes.yml
+  BLOATY_OUTPUT_CACHE_KEY: ${{ runner.os }}-${{ github.head_ref || github.ref_name }}-${{ github.sha }}
   BLOATY_CACHE_PATH: cache/bin/bloaty
   BLOATY_OUTPUT_FILE: ${{ github.workspace }}/current-bloaty-output.csv
-  BASE_REF_BLOATY_OUTPUT_CACHE_KEY: bloaty-output
+  # This must match BLOATY_OUTPUT_CACHE_KEY in compute-binary-sizes.yml
+  BASE_REF_BLOATY_OUTPUT_CACHE_KEY: bloaty-${{ runner.os }}-${{ github.event.pull_request.base.sha }}
   BASE_REF_BLOATY_OUTPUT_FILE: ${{ github.workspace }}/bloaty-output.csv
 
 jobs:
@@ -61,7 +64,7 @@ jobs:
           Copy-Item ${{ env.BUILD_ROOT }}/bloaty/bloaty.exe -Destination ${{ env.BLOATY_CACHE_PATH }}
 
   binary_size_info:
-    name: Compute binary sizes
+    name: Compare binary sizes
     needs: [bloaty]
     runs-on: windows-latest
 
@@ -70,28 +73,34 @@ jobs:
       BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: kendalharland/gha-compare-binary-sizes
+          path: gha-compare-binary-sizes
+
       - name: Restore base ref bloaty output
         uses: actions/cache/restore@v3
-        id: cache
+        id: base-ref-cache
         with:
           key: ${{ env.BASE_REF_BLOATY_OUTPUT_CACHE_KEY }}
           path: ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }}
 
       - name: Show base ref bloaty output
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
         run: |
           ls ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }}
           get-content ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }}
 
       - name: Restore bloaty
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
         uses: actions/cache/restore@v3
         with:
           key: ${{ env.BLOATY_CACHE_KEY }}
           path: ${{ env.BLOATY_CACHE_PATH }}
 
       - name: Add bloaty to PATH
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
         run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Download binary artifacts
@@ -102,7 +111,7 @@ jobs:
 
       # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
       - name: Generate bloaty options file
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
         run: |
           New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
@@ -122,14 +131,43 @@ jobs:
           echo "data_source: `"inputfiles`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
           echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
-      - name: Show bloaty options file
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
-        run: Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
+          # Show the file for easier debugging
+          Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
         run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
 
+      - name: Setup Python dependencies cache
+        id: python-deps-cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/')}}
+          path: ~\AppData\Local\pip\Cache
+          # TODO: restore-keys?
+
+      - name: Install Python dependencies
+        if: ${{ steps.python-deps-cache.outputs.cache-hit != 'true' }}
+        run: |
+          pip install pandas
+
       - name: Diff bloaty output
-        if: ${{ steps.cache.outputs.cache-hit == 'true' }}
-        run: compare-object (get-content ${{ env.BLOATY_OUTPUT_FILE }}) (get-content ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }})
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        run: |
+          $Script="./gha-compare-binary-sizes/scripts/bloaty_diff_csv_output.py"
+          python ${Script} ${{ env.BLOATY_OUTPUT_FILE }} ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }} `
+            -f "markdown" `
+            -o "${{ github.workspace }}/bloaty_diff.md"
+
+      # TODO(kendal): Otherwise just print the diff.
+      # - name: Comment on pull request
+      #   if: steps.pr-changes.outputs.changes != '[]'
+      #   run: |
+      #     $PrNumber=${{ github.event.pull_request.number }}
+      #     $Comment=$(get-content ${{ github.workspace }}/bloaty_diff.md)
+      #     $GithubToken=${{ secrets.GITHUB_TOKEN }}
+      #     $CommentUrl="https://api.github.com/repos/${{ github.repository }}/issues/${PrNumber}/comments"
+
+      #     Invoke-WebRequest -Uri ("https://mixpanel.com/api/2.0/jql") -Headers $Headers -Method Post -Body @{"script" = $query}
+      #     curl -s -H "Authorization: token ${GithubToken}" -X POST ${CommentUrl} -d "{`"body`":`"${Comment}`"}"
+

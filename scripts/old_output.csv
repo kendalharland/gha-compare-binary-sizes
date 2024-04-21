@@ -1,0 +1,7 @@
+inputfiles,segments,filesize,vmsize
+C:\path\to\file.txt,.text,50,25
+C:\path\to\file.txt,.data,50,25
+C:\path\to\another\file.txt,.text,2623646275,44
+C:\path\to\another\file.txt,.data,3243590,33
+C:\path\to\old\file.txt,.text,13567800,100
+C:\path\to\old\file.txt,.data,71220720,100
