@@ -1,0 +1,1 @@
+| Filename | File Size Delta | VM Size Delta |\n| -:       | -:              | -:            |\n|C:\path\to\another\file.txt|$\color{lime}{\textsf{2.56 GB ▼}}$|$\color{gray}{\textsf{0.00 B  }}$|\n|C:\path\to\file.txt|$\color{red}{\textsf{529.80 MB ▲}}$|$\color{red}{\textsf{61.00 B ▲}}$|

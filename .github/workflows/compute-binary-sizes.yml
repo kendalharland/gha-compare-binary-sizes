@@ -64,7 +64,7 @@ jobs:
           New-Item -Path ${{ env.BLOATY_CACHE_PATH }} -ItemType Directory -Force | Out-Null
           Copy-Item ${{ env.BUILD_ROOT }}/bloaty/bloaty.exe -Destination ${{ env.BLOATY_CACHE_PATH }}
 
-  binary_size_info:
+  compute_binary_sizes:
     name: Compute binary sizes
     needs: [bloaty]
     runs-on: windows-latest
@@ -110,14 +110,13 @@ jobs:
           echo "data_source: `"inputfiles`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
           echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
 
-          # Show the file for easier debugging
+          # Show the output for debugging
           Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
 
       - name: Run bloaty
-        run: bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
-
-      - name: Show bloaty output
-        run: Get-Content ${{ env.BLOATY_OUTPUT_FILE }}
+        run: |
+          bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
+          Get-Content ${{ env.BLOATY_OUTPUT_FILE }}
 
       - name: Cache bloaty output
         id: cache

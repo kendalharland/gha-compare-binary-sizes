@@ -123,6 +123,7 @@ The scripts and documentation in this project are released under the MIT License
 - File format support
 
 ### TODO:
+- Document that this  workflow needs the `issues: write` permission to post comments on prs.
 - Make these workflows cross-platform by using an initial context-step. Test just on windows.
 - Figure out how to test these workflows.
 - Documentation about how this works at a high level.

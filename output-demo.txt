@@ -1,0 +1,1 @@
+﻿pr_comment=@"| Filename | File Size Delta | VM Size Delta | | -:       | -:              | -:            | |C:\path\to\another\file.txt|$\color{lime}{\textsf{2.56 GB â–¼}}$|$\color{gray}{\textsf{0.00 B  }}$| |C:\path\to\file.txt|$\color{red}{\textsf{529.80 MB â–²}}$|$\color{red}{\textsf{61.00 B â–²}}$|"@
