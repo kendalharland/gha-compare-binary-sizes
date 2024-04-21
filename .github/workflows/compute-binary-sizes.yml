@@ -16,7 +16,7 @@ env:
   BLOATY_CACHE_KEY: bloaty
   BLOATY_CACHE_PATH: cache/bin/bloaty
   # This must match BASE_REF_BLOATY_OUTPUT_CACHE_KEY in compare-binary-sizes.yml
-  BLOATY_OUTPUT_CACHE_KEY: boaty-output-${{ github.sha }}
+  BLOATY_OUTPUT_CACHE_KEY: bloaty-output-${{ github.sha }}
   BLOATY_OUTPUT_FILE: ${{ github.workspace }}/bloaty-output.csv
 
 jobs:
