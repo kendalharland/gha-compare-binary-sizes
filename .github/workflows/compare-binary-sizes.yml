@@ -11,7 +11,7 @@ env:
   BUILD_ROOT: ${{ github.workspace }}/build
 
   # These values must match the ones in compute-binary-sizes.yml
-  # TODO(kendal): Scope this by os
+  BLOATY_CACHE_KEY: bloaty
   BLOATY_CACHE_PATH: cache/bin/bloaty
   BLOATY_OUTPUT_FILE: ${{ github.workspace }}/current-bloaty-output.csv
   # This must match BLOATY_OUTPUT_CACHE_KEY in compute-binary-sizes.yml
