@@ -11,11 +11,11 @@ env:
   BUILD_ROOT: ${{ github.workspace }}/build
 
   # These values must match the ones in compute-binary-sizes.yml
-  BLOATY_OUTPUT_CACHE_KEY: ${{ runner.os }}-${{ github.head_ref || github.ref_name }}-${{ github.sha }}
+  # TODO(kendal): Scope this by os
   BLOATY_CACHE_PATH: cache/bin/bloaty
   BLOATY_OUTPUT_FILE: ${{ github.workspace }}/current-bloaty-output.csv
   # This must match BLOATY_OUTPUT_CACHE_KEY in compute-binary-sizes.yml
-  BASE_REF_BLOATY_OUTPUT_CACHE_KEY: bloaty-${{ runner.os }}-${{ github.event.pull_request.base.sha }}
+  BASE_REF_BLOATY_OUTPUT_CACHE_KEY: bloaty-output-${{ github.event.pull_request.base.sha }}
   BASE_REF_BLOATY_OUTPUT_FILE: ${{ github.workspace }}/bloaty-output.csv
 
 jobs:
@@ -142,7 +142,7 @@ jobs:
         id: python-deps-cache
         uses: actions/cache@v4
         with:
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/')}}
+          key: pip-${{ hashFiles('**/')}}
           path: ~\AppData\Local\pip\Cache
           # TODO: restore-keys?
 
