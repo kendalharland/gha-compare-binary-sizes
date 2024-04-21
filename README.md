@@ -1,4 +1,4 @@
-# Compare Binary Sizes Workflow
+# Compare binary sizes workflow
 
 These workflows display a pull request's impact on the size of one or more binary files.
 
