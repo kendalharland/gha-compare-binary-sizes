@@ -1,7 +1,0 @@
-inputfiles,segments,filesize,vmsize
-C:\path\to\file.txt,.text,523534550,98
-C:\path\to\file.txt,.data,6264313,13
-C:\path\to\another\file.txt,.text,663175,44
-C:\path\to\another\file.txt,.data,66624550,33
-C:\path\to\new\file.txt,.text,10234230,100
-C:\path\to\new\file.txt,.data,1020,100

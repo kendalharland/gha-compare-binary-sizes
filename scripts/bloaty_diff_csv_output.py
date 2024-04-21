@@ -95,7 +95,7 @@ def main():
 
   output = format_dataframe_as_markdown_table(diff_df)
 
-  with open(output_file, 'w+', encoding='utf-8') as output_file:
+  with open(args.output_path, 'w+', encoding='utf-8') as output_file:
      output_file.write(output)
 
 main()

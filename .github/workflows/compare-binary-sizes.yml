@@ -159,7 +159,6 @@ jobs:
             -f "markdown" `
             -o "${{ github.workspace }}/bloaty_diff.md"
 
-      # TODO(kendal): Otherwise just print the diff.
       # - name: Comment on pull request
       #   if: steps.pr-changes.outputs.changes != '[]'
       #   run: |
