@@ -111,7 +111,7 @@ jobs:
 
 - The `compare-binary-sizes` workflow needs `issues: write` permission to
   comment on pull requests. Either give `$GITHUB_TOKEN` read/write permissions
-  by following [this guide][#github-token-guide], or provide a token with these
+  by following [this guide][github-token-guide], or provide a token with these
   permissions using the workflow input `token`.
 
 ## Limitations
