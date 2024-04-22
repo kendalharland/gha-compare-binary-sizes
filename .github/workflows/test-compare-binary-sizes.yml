@@ -1,0 +1,30 @@
+name: Test compare binary sizes
+
+on:
+  pull_request:
+  
+jobs:
+  build:
+    name: Build artifacts to compare
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build main
+        run: |
+          New-Item -ItemType directory build
+          gcc test/main.c -o build/main
+
+      - name: Upload artifacts to compare
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: build
+
+  compare_binary_sizes:
+    name: Compare binary sizes
+    needs: [build]
+    uses: ./.github/workflows/compare-binary-sizes.yml
+    with:
+      artifact: binaries

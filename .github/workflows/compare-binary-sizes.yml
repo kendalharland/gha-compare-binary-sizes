@@ -1,0 +1,184 @@
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: 'A github artifact containing the binary files to compare. It can be a directory or a single file. All files are compared.'
+        required: true
+        type: string
+
+env:
+  SOURCE_ROOT: ${{ github.workspace }}/source
+  BUILD_ROOT: ${{ github.workspace }}/build
+  BLOATY_CACHE_KEY: bloaty
+  BLOATY_CACHE_PATH: cache/bin/bloaty
+  BLOATY_OUTPUT_FILE: ${{ github.workspace }}/current-bloaty-output.csv
+
+  # This must match BLOATY_OUTPUT_CACHE_KEY in snapshot-binary-sizes.yml
+  BASE_REF_BLOATY_OUTPUT_CACHE_KEY: bloaty-output-${{ github.event.pull_request.base.sha }}
+  BASE_REF_BLOATY_OUTPUT_FILE: ${{ github.workspace }}/bloaty-output.csv
+
+jobs:
+  bloaty:
+    name: Build bloaty
+    runs-on: windows-latest
+
+    steps:
+      - name: Setup bloaty cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ env.BLOATY_CACHE_KEY }}
+          path: ${{ env.BLOATY_CACHE_PATH }}
+
+      - name: Checkout google/bloaty@34f4a66559ad4938c1e629e9b5f54630b2b4d7b0
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: google/bloaty
+          ref: refs/heads/main
+          path: ${{ env.SOURCE_ROOT }}/bloaty
+          show-progress: false
+
+      # This step installs Ninja.
+      - name: Setup VS dev environment.
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: compnerd/gha-setup-vsdevenv@main
+        with:
+          host_arch: amd64
+          components: 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+          arch: amd64
+
+      - name: Configure bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cmake -B ${{ env.BUILD_ROOT }}/bloaty -S ${{ env.SOURCE_ROOT }}/bloaty -G Ninja
+
+      - name: Build bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cmake --build ${{ env.BUILD_ROOT }}/bloaty
+
+      - name: Add bloaty to the cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          New-Item -Path ${{ env.BLOATY_CACHE_PATH }} -ItemType Directory -Force | Out-Null
+          Copy-Item ${{ env.BUILD_ROOT }}/bloaty/bloaty.exe -Destination ${{ env.BLOATY_CACHE_PATH }}
+
+  compare_binary_sizes:
+    needs: [bloaty]
+    runs-on: windows-latest
+    outputs:
+      pr_comment: ${{ steps.pr_comment.outputs.pr_comment }}
+
+    env:
+      ARTIFACT_ROOT: ${{ github.workspace }}/artifacts
+      BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: kendalharland/gha-compare-binary-sizes
+          path: gha-compare-binary-sizes
+
+      - name: Restore base ref bloaty output
+        uses: actions/cache/restore@v3
+        id: base-ref-cache
+        with:
+          key: ${{ env.BASE_REF_BLOATY_OUTPUT_CACHE_KEY }}
+          path: ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }}
+
+      - name: Show base ref bloaty output
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        run: |
+          ls ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }}
+          Get-Content ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }}
+
+      - name: Restore bloaty
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        uses: actions/cache/restore@v3
+        with:
+          key: ${{ env.BLOATY_CACHE_KEY }}
+          path: ${{ env.BLOATY_CACHE_PATH }}
+
+      - name: Add bloaty to PATH
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ env.ARTIFACT_ROOT }}
+
+      # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
+      - name: Generate bloaty options file
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        run: |
+          New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
+
+          # Generate the list of input files.
+          # Each input filename must be an absolute path.
+          # Unix-style path separators are required.
+          # The textproto output must be ascii encoded.
+          foreach($path in $(ls ${{ env.ARTIFACT_ROOT }})) {
+            echo "filename: `"${path}`"" | `
+              %{ $_ -replace '\\','/' } | `
+              Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+          }
+
+          echo "sort_by: SORTBY_FILESIZE" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+
+          # These are the only data sources supported by bloaty's PE/COFF format.
+          echo "data_source: `"inputfiles`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+          echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+
+          # Show the output for easier debugging
+          Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
+
+      - name: Run bloaty
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        run: |
+          bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
+          Get-Content ${{ env.BLOATY_OUTPUT_FILE }}
+
+      - name: Install Python dependencies
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        run: pip install pandas
+
+      - name: Diff bloaty output
+        if: ${{ steps.base-ref-cache.outputs.cache-hit == 'true' }}
+        run: |
+          $Script="./gha-compare-binary-sizes/scripts/bloaty_diff_csv_output.py"
+          python ${Script} ${{ env.BLOATY_OUTPUT_FILE }} ${{ env.BASE_REF_BLOATY_OUTPUT_FILE }} `
+            -f "markdown" `
+            -o "${{ github.workspace }}/bloaty_diff.md"
+
+      - name: Upload PR comment
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-comment-${{ github.sha }}
+          path: ${{ github.workspace }}/bloaty_diff.md
+
+  comment_on_pr:
+    name: Comment on pull request
+    runs-on: ubuntu-latest
+    needs: [compare_binary_sizes]
+    steps:
+    - name: Download PR comment
+      uses: actions/download-artifact@v4
+      with:
+        name: pr-comment-${{ github.sha }}
+        path: ${{ github.workspace }}/pr-comment
+
+    - run: npm install fs
+
+    - uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs')
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: fs.readFileSync('${{ github.workspace }}/pr-comment/bloaty_diff.md', 'utf8')
+          })

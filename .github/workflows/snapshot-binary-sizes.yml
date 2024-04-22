@@ -1,0 +1,123 @@
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: 'Github artifact containing the binary files. Either a file or directory'
+        required: true
+        type: string
+
+# TODO(kendal): Document cache usage
+
+env:
+  SOURCE_ROOT: ${{ github.workspace }}/source
+  BUILD_ROOT: ${{ github.workspace }}/build
+  BLOATY_CACHE_KEY: bloaty
+  BLOATY_CACHE_PATH: cache/bin/bloaty
+  BLOATY_OUTPUT_FILE: ${{ github.workspace }}/bloaty-output.csv
+  
+  # This must match BASE_REF_BLOATY_OUTPUT_CACHE_KEY in compare-binary-sizes.yml
+  BLOATY_OUTPUT_CACHE_KEY: bloaty-output-${{ github.sha }}
+
+jobs:
+  bloaty:
+    runs-on: windows-latest
+
+    steps:
+      - name: Setup bloaty cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ env.BLOATY_CACHE_KEY }}
+          path: ${{ env.BLOATY_CACHE_PATH }}
+
+      - name: Checkout google/bloaty@34f4a66559ad4938c1e629e9b5f54630b2b4d7b0
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: google/bloaty
+          ref: refs/heads/main
+          path: ${{ env.SOURCE_ROOT }}/bloaty
+          show-progress: false
+
+      # This step installs Ninja.
+      - name: Setup VS dev environment.
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: compnerd/gha-setup-vsdevenv@main
+        with:
+          host_arch: amd64
+          components: 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64'
+          arch: amd64
+
+      - name: Configure bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cmake -B ${{ env.BUILD_ROOT }}/bloaty -S ${{ env.SOURCE_ROOT }}/bloaty -G Ninja
+
+      - name: Build bloaty
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: cmake --build ${{ env.BUILD_ROOT }}/bloaty
+
+      - name: Add bloaty to the cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          New-Item -Path ${{ env.BLOATY_CACHE_PATH }} -ItemType Directory -Force | Out-Null
+          Copy-Item ${{ env.BUILD_ROOT }}/bloaty/bloaty.exe -Destination ${{ env.BLOATY_CACHE_PATH }}
+
+  snapshot_binary_sizes:
+    needs: [bloaty]
+    runs-on: windows-latest
+
+    env:
+      ARTIFACT_ROOT: ${{ github.workspace }}/artifacts
+      BLOATY_OPTIONS_FILE: ${{ github.workspace }}/bloaty.textproto
+
+    steps:
+      - name: Restore bloaty
+        uses: actions/cache/restore@v3
+        with:
+          key: ${{ env.BLOATY_CACHE_KEY }}
+          path: ${{ env.BLOATY_CACHE_PATH }}
+
+      - name: Add bloaty to PATH
+        run: echo ${{ env.BLOATY_CACHE_PATH }} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ env.ARTIFACT_ROOT }}
+
+      # For the options file schema, see https://github.com/google/bloaty/blob/main/src/bloaty.proto.
+      - name: Generate bloaty options file
+        run: |
+          New-Item -Path ${{ env.BLOATY_OPTIONS_FILE }}
+
+          # Generate the list of input files.
+          # Each input filename must be an absolute path.
+          # Unix-style path separators are required.
+          # The textproto output must be ascii encoded.
+          foreach($path in $(ls ${{ env.ARTIFACT_ROOT }})) {
+            echo "filename: `"${path}`"" | `
+              %{ $_ -replace '\\','/' } | `
+              Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+          }
+
+          echo "sort_by: SORTBY_FILESIZE" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+
+          # These are the only data sources supported by bloaty's PE/COFF support.
+          echo "data_source: `"inputfiles`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+          echo "data_source: `"segments`"" | Out-File ${{ env.BLOATY_OPTIONS_FILE }} -Append -Encoding ascii
+
+          # Show the output for debugging
+          Get-Content -Path ${{ env.BLOATY_OPTIONS_FILE }}
+
+      - name: Run bloaty
+        run: |
+          bloaty -c ${{ env.BLOATY_OPTIONS_FILE }} -w -n 0 --csv | Out-File ${{ env.BLOATY_OUTPUT_FILE }} -Encoding utf8
+          Get-Content ${{ env.BLOATY_OUTPUT_FILE }}
+
+      - name: Cache bloaty output
+        id: cache
+        uses: actions/cache/save@v3
+        with:
+          key: ${{ env.BLOATY_OUTPUT_CACHE_KEY }}
+          path: ${{ env.BLOATY_OUTPUT_FILE }}

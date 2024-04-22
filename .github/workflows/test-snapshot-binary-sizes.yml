@@ -1,0 +1,32 @@
+name: Test snapshot binary sizes
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  build:
+    name: Build artifacts to snapshot
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build main
+        run: |
+          New-Item -ItemType directory build
+          gcc test/main.c -o build/main
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: build
+
+  snapshot_binary_sizes:
+    name: Snapshot binary sizes
+    needs: [build]
+    uses: ./.github/workflows/snapshot-binary-sizes.yml
+    with:
+      artifact: binaries
